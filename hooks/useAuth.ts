@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore, type AuthUser, type UserRole } from '@/store/authStore';
 import { authApiService } from '@/services/auth.service';
+import { sessionService } from '@/services/sessionService';
 
 interface UseAuthReturn {
   isAuthenticated: boolean;
@@ -10,18 +11,13 @@ interface UseAuthReturn {
   user: AuthUser | null;
 }
 
-const API_TO_STORE_ROLE: Record<string, UserRole> = {
-  customer: 'Customer',
-  driver: 'Driver',
-  admin: 'Admin',
-};
-
+/** Thin accessor over the centralized session; see SessionProvider. */
 export function useAuth(): UseAuthReturn {
   const [isLoading, setIsLoading] = useState(true);
   const { user, isAuthenticated, setUser, clearUser } = useAuthStore();
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    const token = sessionService.getToken();
 
     const verify = async () => {
       if (!token) {
@@ -41,7 +37,7 @@ export function useAuth(): UseAuthReturn {
           }
         })
         .catch(() => {
-          localStorage.removeItem('authToken');
+          sessionService.clear();
           clearUser();
         })
         .finally(() => setIsLoading(false));
