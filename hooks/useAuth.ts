@@ -1,7 +1,9 @@
 'use client';
 
-import { useSession } from '@/context/SessionContext';
-import type { AuthUser } from '@/store/authStore';
+import { useState, useEffect } from 'react';
+import { useAuthStore, type AuthUser, type UserRole } from '@/store/authStore';
+import { authApiService } from '@/services/auth.service';
+import { sessionService } from '@/services/sessionService';
 
 interface UseAuthReturn {
   isAuthenticated: boolean;
@@ -11,6 +13,39 @@ interface UseAuthReturn {
 
 /** Thin accessor over the centralized session; see SessionProvider. */
 export function useAuth(): UseAuthReturn {
-  const { isAuthenticated, isLoading, user } = useSession();
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated, setUser, clearUser } = useAuthStore();
+
+  useEffect(() => {
+    const token = sessionService.getToken();
+
+    const verify = async () => {
+      if (!token) {
+        clearUser();
+        setIsLoading(false);
+        return;
+      }
+
+      authApiService
+        .getCurrentUser()
+        .then((res) => {
+          if (res.data) {
+            const role: UserRole = API_TO_STORE_ROLE[res.data.role] ?? 'Customer';
+            setUser({ id: res.data.id, email: res.data.email, role });
+          } else {
+            clearUser();
+          }
+        })
+        .catch(() => {
+          sessionService.clear();
+          clearUser();
+        })
+        .finally(() => setIsLoading(false));
+    };
+
+    void verify();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return { isAuthenticated, isLoading, user };
 }
